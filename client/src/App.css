@@ -1,0 +1,187 @@
+@import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@700&family=Pacifico&display=swap');
+
+:root {
+  --primary-color: #4dd0e1;
+  --secondary-color: #81d4fa;
+  --accent-color: #f48fb1;
+
+  --card-bg-color: #1E4241;
+  --card-text-color: #b2dfdb;
+  --border-color: rgba(255,255,255,0.08);
+  --shadow-color: rgba(0,0,0,0.3);
+
+  --background-color: #0B1F3A;
+  --navbar-bg-color: #112B51;
+  --footer-bg-color: #0A1B33;
+  --text-color: #e0f7fa;
+}
+
+html, body, #root {
+  background-color: var(--background-color) !important;
+  color: var(--text-color) !important;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: var(--background-color);
+  color: var(--text-color);
+}
+
+/* Navbar */
+.navbar {
+  background-color: var(--navbar-bg-color) !important;
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: 0 2px 6px var(--shadow-color);
+}
+
+/* Navbar brand: My Blog Spot */
+.navbar-brand {
+  font-family: 'Pacifico', cursive;
+  color: #A7C7E7 !important;
+  font-weight: 400;
+  font-size: 2.5rem;
+  text-transform: capitalize;
+  text-shadow: 1px 1px 3px rgba(0,0,0,0.4);
+  transition: color 0.3s ease, text-shadow 0.3s ease;
+  cursor: pointer;
+}
+
+.navbar-brand:hover {
+  color: var(--primary-color) !important;
+  text-shadow: 2px 2px 8px var(--primary-color);
+}
+
+/* Navbar links: Home, Create Post */
+.nav-link {
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+  color: #C0D6F9 !important;
+  font-weight: 600;
+  font-size: 1.1rem;
+  letter-spacing: 0.5px;
+  text-transform: capitalize;
+  transition: color 0.3s ease;
+  cursor: pointer;
+}
+
+.nav-link:hover {
+  color: var(--primary-color) !important;
+}
+
+/* Footer */
+.footer {
+  background-color: var(--footer-bg-color);
+  color: var(--text-color);
+  text-align: center;
+  padding: 1rem 0;
+  border-top: 1px solid var(--border-color);
+  box-shadow: 0 -2px 6px var(--shadow-color);
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+/* Main content container */
+main.container {
+  flex-grow: 1;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+/* Homepage Heading */
+.container h1 {
+  font-family: 'Merriweather', serif;
+  font-size: 3.5rem;
+  color: var(--secondary-color);
+  text-align: center;
+  margin-bottom: 2rem;
+  text-shadow: 0 0 8px var(--secondary-color), 0 0 20px var(--primary-color);
+  letter-spacing: 1.5px;
+  font-weight: 700;
+}
+
+/* Cards */
+.card {
+  background-color: var(--card-bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  box-shadow: 0 4px 12px var(--shadow-color);
+  padding: 1.5rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  color: var(--card-text-color);
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px var(--shadow-color);
+}
+
+/* Card Titles and Text */
+.card-title {
+  color: var(--primary-color);
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.card-text {
+  color: var(--card-text-color);
+  font-size: 1rem;
+}
+
+/* Buttons */
+.btn-primary {
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+  transition: background-color 0.3s ease;
+}
+
+.btn-primary:hover {
+  background-color: var(--secondary-color);
+  border-color: var(--secondary-color);
+}
+
+/* Spinner */
+.spinner-border {
+  width: 3rem;
+  height: 3rem;
+  color: var(--primary-color);
+}
+
+/* Muted text */
+.text-muted {
+  font-size: 1.1rem;
+  color: var(--card-text-color) !important;
+}
+
+/* Custom alert */
+.custom-alert-danger {
+  background: linear-gradient(45deg, #430f12, #641919);
+  color: #f87171;
+  border: 1px solid #7f1d1d;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.4);
+  padding: 2rem;
+  border-radius: 1rem;
+  text-align: center;
+  animation: fadeInSlideUp 0.6s ease-in-out;
+}
+
+.custom-alert-danger .alert-heading {
+  font-size: 1.8rem;
+  color: #f87171;
+  margin-bottom: 1rem;
+}
+
+@keyframes fadeInSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
