@@ -1,15 +1,24 @@
 import mongoose from 'mongoose';
 
 const connectDB = async () => {
+  const mongoUri = process.env.MONGO_URI;
+
+  if (!mongoUri) {
+    console.error('\n❌ Fatal: MONGO_URI not set in environment.');
+    console.error('Required environment variables: MONGO_URI, JWT_SECRET.');
+    console.error('Create a .env file with these values and restart the server.');
+    process.exit(1);
+  }
+
   try {
-    // These options are no longer needed for Mongoose v4.0.0+
-    // and are safe to remove.
-    const conn = await mongoose.connect(process.env.MONGO_URI); 
-    
+    const conn = await mongoose.connect(mongoUri, {
+      serverSelectionTimeoutMS: 10000,
+      connectTimeoutMS: 10000,
+    });
     console.log(`MongoDB Connected: ${conn.connection.host}`);
   } catch (error) {
     console.error(`❌ MongoDB Connection Error: ${error.message}`);
-    process.exit(1); // Exit process with failure
+    throw error;
   }
 };
 
