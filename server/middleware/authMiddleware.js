@@ -2,46 +2,27 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import Post from '../models/Post.js'; // Make sure Post model is imported if authorizePostOwnership is in this file
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key';
-
 const protect = async (req, res, next) => {
   let token;
 
-  // Debugging logs
-  console.log('--- Auth Middleware ---');
-  console.log('Request headers:', req.headers);
-
-  if (
-    req.headers.authorization &&
-    req.headers.authorization.startsWith('Bearer')
-  ) {
+  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     try {
       token = req.headers.authorization.split(' ')[1];
-      console.log('Extracted Token:', token); // Debugging log
-
+      const JWT_SECRET = process.env.JWT_SECRET;
       const decoded = jwt.verify(token, JWT_SECRET);
-      console.log('Decoded Token:', decoded); // Debugging log
-
       req.user = await User.findById(decoded.id).select('-password');
-      console.log('User found in DB (req.user):', req.user); // Debugging log
 
       if (!req.user) {
-        console.log('Auth failed: User not found in DB for decoded ID.'); // Debugging log
         return res.status(401).json({ message: 'User not found.' });
       }
 
-      next();
+      return next();
     } catch (err) {
-      console.error('Auth middleware error (verify/find):', err.message); // More detailed error logging
       return res.status(401).json({ message: 'Not authorized, token failed.' });
     }
   }
 
-  if (!token) {
-    console.log('Auth failed: No token found in headers.'); // Debugging log
-    return res.status(401).json({ message: 'Not authorized, no token.' });
-  }
-  console.log('--- End Auth Middleware ---'); // Debugging log
+  return res.status(401).json({ message: 'Not authorized, no token.' });
 };
 
 const authorizePostOwnership = async (req, res, next) => {
