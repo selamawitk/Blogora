@@ -16,6 +16,6 @@ router.route('/posts/:postId/comments')
   .post(protect, createComment); // Apply 'protect' middleware here
 
 // DELETE a comment by its ID (requires authentication + ownership check)
-router.route('/:id').delete(protect, deleteComment); // 'protect' is applied, ownership check will be in controller
+router.route('/comments/:id').delete(protect, deleteComment); // 'protect' is applied, ownership check will be in controller
 
 export default router;
