@@ -1,36 +1,57 @@
-// client/src/pages/BlogPage.js
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import { motion } from 'framer-motion';
+import { Heart, Bookmark, Clock, User, Edit3, Trash2, MessageCircle, ArrowLeft, Link2, Globe } from 'lucide-react';
 import CommentCard from '../components/CommentCard';
-import { AuthContext } from '../context/AuthContext.js';
+import { useAuth } from '../context/AuthContext';
+
+const GRADIENTS = [
+  'linear-gradient(135deg, #0FCAEB22, #06B6D411)',
+  'linear-gradient(135deg, #F59E0B22, #F9731611)',
+  'linear-gradient(135deg, #8B5CF622, #6366F111)',
+  'linear-gradient(135deg, #EC489922, #F9731611)',
+  'linear-gradient(135deg, #10B98122, #06B6D411)',
+];
+
+function getGradient(title) {
+  let hash = 0;
+  for (let i = 0; i < (title || '').length; i++) hash = title.charCodeAt(i) + ((hash << 5) - hash);
+  return GRADIENTS[Math.abs(hash) % GRADIENTS.length];
+}
 
 function BlogPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [blog, setBlog] = useState(null);
   const [loading, setLoading] = useState(true);
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState('');
-  const { user } = useContext(AuthContext);
+  const [replyTo, setReplyTo] = useState(null);
+  const [relatedPosts, setRelatedPosts] = useState([]);
+  const [saved, setSaved] = useState(false);
+  const [shareMessage, setShareMessage] = useState('');
+  const [likesCount, setLikesCount] = useState(0);
+  const [userLiked, setUserLiked] = useState(false);
 
   useEffect(() => {
-    if (!id) {
-      navigate('/');
-      return;
-    }
+    if (!id) { navigate('/'); return; }
 
     const fetchBlogAndComments = async () => {
       try {
         const blogRes = await api.get(`/posts/${id}`);
-        setBlog(blogRes.data);
+        const blogData = blogRes.data?.success ? blogRes.data.data : blogRes.data;
+        setBlog(blogData);
 
         const commentsRes = await api.get(`/posts/${id}/comments`);
-        setComments(commentsRes.data);
+        setComments(Array.isArray(commentsRes.data) ? commentsRes.data : commentsRes.data?.data || []);
+
+        const likesRes = await api.get(`/posts/${id}/likes`);
+        setLikesCount(likesRes.data.count || 0);
+        setUserLiked(likesRes.data.userLiked || false);
       } catch (err) {
-        console.error('Blog or Comments fetch error:', err.response?.data?.message || err.message);
-        alert(err.response?.data?.message || 'Error fetching blog post or comments.');
+        console.error('Blog fetch error:', err.response?.data || err.message);
         navigate('/');
       } finally {
         setLoading(false);
@@ -40,217 +61,492 @@ function BlogPage() {
     fetchBlogAndComments();
   }, [id, navigate]);
 
-  const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this post?')) {
+  useEffect(() => {
+    const savedPosts = JSON.parse(localStorage.getItem('savedPosts') || '[]');
+    setSaved(savedPosts.includes(id));
+  }, [id]);
+
+  useEffect(() => {
+    if (!blog) return;
+    const fetchRelated = async () => {
       try {
-        await api.delete(`/posts/${id}`);
-        navigate('/');
-      } catch (err) {
-        console.error('Delete error:', err.response?.data?.message || err.message);
-        alert(err.response?.data?.message || 'Failed to delete post.');
-      }
+        const res = await api.get('/posts');
+        const allPosts = res.data?.success ? res.data.data : Array.isArray(res.data) ? res.data : [];
+        const filtered = allPosts.filter((post) => post._id !== blog._id).slice(0, 3);
+        setRelatedPosts(filtered);
+      } catch (error) { /* ignore */ }
+    };
+    fetchRelated();
+  }, [blog]);
+
+  const userId = user?.id || user?._id;
+  const blogUserId = blog?.user?._id || blog?.user;
+  const isPostCreator = userId && blogUserId && userId.toString() === blogUserId.toString();
+  const postAuthorId = blog?.user?._id || null;
+
+  const wordCount = blog?.content?.trim().split(/\s+/).length || 0;
+  const readingTime = Math.max(1, Math.ceil(wordCount / 220));
+
+  const handleLike = async () => {
+    if (!user) { navigate('/signin'); return; }
+    try {
+      const res = await api.post(`/posts/${id}/likes`);
+      setLikesCount(res.data.count);
+      setUserLiked(res.data.liked);
+    } catch (err) {
+      console.error('Like error:', err.response?.data?.message || err.message);
     }
+  };
+
+  const handleBookmark = () => {
+    const savedPosts = JSON.parse(localStorage.getItem('savedPosts') || '[]');
+    const nextSavedPosts = saved
+      ? savedPosts.filter((savedId) => savedId !== id)
+      : [...savedPosts, id];
+    localStorage.setItem('savedPosts', JSON.stringify(nextSavedPosts));
+    setSaved(!saved);
+  };
+
+  const handleShare = async (type) => {
+    const shareUrl = window.location.href;
+    const text = blog?.title || 'Check out this article';
+
+    if (type === 'copy') {
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        setShareMessage('Link copied to clipboard.');
+        setTimeout(() => setShareMessage(''), 3000);
+      } catch {
+        setShareMessage('Unable to copy link.');
+      }
+      return;
+    }
+
+    let url = '';
+    if (type === 'twitter') {
+      url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`;
+    } else if (type === 'linkedin') {
+      url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`;
+    } else if (type === 'facebook') {
+      url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
+    }
+    window.open(url, '_blank', 'width=600,height=400');
+  };
+
+  const handleDelete = async () => {
+    if (!window.confirm('Are you sure you want to delete this post?')) return;
+    try {
+      await api.delete(`/posts/${id}`);
+      navigate('/');
+    } catch (err) {
+      console.error('Delete error:', err.response?.data?.message || err.message);
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm('Delete this comment?')) return;
+    try {
+      await api.delete(`/comments/${commentId}`);
+      setComments((prev) => prev.filter((c) => c._id !== commentId)
+        .map((c) => ({ ...c, replies: c.replies?.filter((r) => r._id !== commentId) || [] })));
+    } catch (err) {
+      console.error('Delete comment error:', err.response?.data?.message || err.message);
+    }
+  };
+
+  const handleReply = (commentId, username) => {
+    setReplyTo({ id: commentId, username });
+    setNewComment(`@${username} `);
+  };
+
+  const cancelReply = () => {
+    setReplyTo(null);
+    setNewComment('');
   };
 
   const handleCommentSubmit = async () => {
     if (!newComment.trim()) return;
-    if (!user) {
-      alert('You must be logged in to comment.');
-      return;
-    }
+    if (!user) { navigate('/signin'); return; }
 
     try {
-      const res = await api.post(
-        `/posts/${id}/comments`,
-        { content: newComment }
-      );
-      setComments((prevComments) => [...prevComments, res.data]); // Functional update for comments state
+      const body = { content: newComment };
+      if (replyTo) body.parentComment = replyTo.id;
+      const res = await api.post(`/posts/${id}/comments`, body);
+
+      if (replyTo) {
+        setComments((prev) => prev.map((c) =>
+          c._id === replyTo.id
+            ? { ...c, replies: [...(c.replies || []), res.data] }
+            : c
+        ));
+      } else {
+        setComments((prev) => [...prev, { ...res.data, replies: [] }]);
+      }
       setNewComment('');
+      setReplyTo(null);
     } catch (err) {
       console.error('Comment post error:', err.response?.data?.message || err.message);
-      alert(err.response?.data?.message || 'Failed to post comment.');
     }
   };
 
   if (loading) {
     return (
-      <div className="text-center my-5">
-        <div
-          className="spinner-border"
-          role="status"
-          style={{ color: '#0FCAEB', width: '3rem', height: '3rem' }}
-        />
+      <div className="blog-loading">
+        <div className="spinner" />
       </div>
     );
   }
 
   if (!blog) {
     return (
-      <div className="text-center my-5 text-danger">
-        <h2>Post not found.</h2>
-        <Link to="/" className="btn btn-primary mt-3">Go Back Home</Link>
-      </div>
+      <motion.div
+        className="notfound-page"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+      >
+        <div className="glass-card">
+          <h2>Post not found.</h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '1.5rem' }}>The article you're looking for doesn't exist or has been removed.</p>
+          <Link to="/" className="hero-cta-btn" style={{ display: 'inline-flex' }}>
+            <ArrowLeft size={16} />
+            Go Back Home
+          </Link>
+        </div>
+      </motion.div>
     );
   }
 
-  const isPostCreator = user && blog && blog.user && user._id === blog.user._id;
+  const author = blog.user || {};
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      style={{
-        maxWidth: '800px',
-        margin: '2rem auto',
-        padding: '2rem',
-        borderRadius: '1.5rem',
-        background: 'linear-gradient(135deg, rgb(2, 38, 67) 70%, #0FCAEB 130%)',
-        backdropFilter: 'blur(6px)',
-        color: '#e2f1f5',
-        boxShadow: '0 8px 30px rgba(0, 0, 0, 0.6)',
-      }}
+      className="blog-detail-page"
     >
-      <h1
-        style={{
-          background: 'linear-gradient(45deg, #0dcaf0, #6610f2)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          fontSize: '2.5rem',
-          fontWeight: 'bold',
-          marginBottom: '1rem',
-          textAlign: 'center',
-        }}
-      >
-        {blog.title}
-      </h1>
-
-      <p className="fst-italic" style={{ textAlign: 'center', color: '#8fa6b8', marginBottom: '1rem' }}>
-        Posted by {blog.user ? blog.user.username : 'Unknown'} on {new Date(blog.createdAt).toLocaleDateString()}
-      </p>
-
-      <div
-        style={{
-          fontSize: '1.1rem',
-          lineHeight: '1.8',
-          color: '#cbd6e2',
-          whiteSpace: 'pre-wrap',
-          textAlign: 'justify',
-          marginBottom: '2rem',
-        }}
-      >
-        {blog.content}
-      </div>
-
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap', marginBottom: '2rem' }}>
-        {isPostCreator && (
-          <>
-            <motion.div whileHover={{ scale: 1.05 }}>
-              <Link
-                to={`/edit/${blog._id}`}
-                className="btn"
-                style={buttonStyle('#0FCAEB', '#00121e')}
-                onMouseOver={(e) => hoverEffect(e, '#0abed8', '#ffffff')}
-                onMouseOut={(e) => hoverEffect(e, '#0FCAEB', '#00121e')}
-              >
-                Edit Post
-              </Link>
-            </motion.div>
-
-            <motion.div whileHover={{ scale: 1.05 }}>
-              <button
-                onClick={handleDelete}
-                className="btn"
-                style={buttonStyle('#dc3545', '#fff')}
-                onMouseOver={(e) => hoverEffect(e, '#b02a37')}
-                onMouseOut={(e) => hoverEffect(e, '#dc3545')}
-              >
-                Delete Post
-              </button>
-            </motion.div>
-          </>
-        )}
-
-        <motion.div whileHover={{ scale: 1.05 }}>
-          <Link
-            to="/"
-            className="btn"
-            style={buttonStyle('#0FCAEB', '#00121e')}
-            onMouseOver={(e) => hoverEffect(e, '#0abed8', '#ffffff')}
-            onMouseOut={(e) => hoverEffect(e, '#0FCAEB', '#00121e')}
-          >
-            Back to Home
-          </Link>
+      <article className="blog-article">
+        <motion.div
+          className="blog-article-header"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+        >
+          <span className="blog-article-badge">Article</span>
+          <h1 className="blog-article-title">{blog.title}</h1>
+          <div className="blog-article-meta">
+            <div className="blog-article-author-row">
+              <div className="blog-detail-avatar">
+                <User size={18} />
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <span className="blog-detail-author-name">{author.username || 'Guest Author'}</span>
+                <div className="blog-detail-meta">
+                  <span>
+                    {new Date(blog.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </span>
+                  <span style={{ color: 'var(--text-muted)' }}>·</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <Clock size={12} />
+                    {readingTime} min read
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         </motion.div>
-      </div>
 
-      <div style={{ marginTop: '2rem' }}>
-        <h3 style={{ color: '#f0f9ff', marginBottom: '1rem' }}>Comments</h3>
+        <motion.div
+          className="blog-article-cover"
+          style={{ background: getGradient(blog.title) }}
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.6, delay: 0.15 }}
+        >
+          {(blog.title || 'B').charAt(0).toUpperCase()}
+        </motion.div>
+
+        <motion.div
+          className="blog-article-actions"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4, delay: 0.25 }}
+        >
+          <motion.button
+            onClick={handleLike}
+            className={`action-btn ${userLiked ? 'liked' : ''}`}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.92 }}
+          >
+            <Heart size={16} />
+            <span>{likesCount}</span>
+          </motion.button>
+          <motion.button
+            onClick={handleBookmark}
+            className={`action-btn ${saved ? 'saved' : ''}`}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.92 }}
+          >
+            <Bookmark size={16} />
+            <span>{saved ? 'Saved' : 'Save'}</span>
+          </motion.button>
+          <motion.button
+            onClick={() => handleShare('twitter')}
+            className="action-btn"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.92 }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            <span className="action-label">Twitter</span>
+          </motion.button>
+          <motion.button
+            onClick={() => handleShare('linkedin')}
+            className="action-btn"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.92 }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+            <span className="action-label">LinkedIn</span>
+          </motion.button>
+          <motion.button
+            onClick={() => handleShare('facebook')}
+            className="action-btn"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.92 }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+            <span className="action-label">Facebook</span>
+          </motion.button>
+          <motion.button
+            onClick={() => handleShare('copy')}
+            className="action-btn"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.92 }}
+          >
+            <Link2 size={16} />
+            <span>Copy Link</span>
+          </motion.button>
+        </motion.div>
+        {shareMessage && <p className="share-message">{shareMessage}</p>}
+
+        <motion.div
+          className="blog-article-content"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+        >
+          <div className="blog-article-body">{blog.content}</div>
+        </motion.div>
+
+        {isPostCreator && (
+          <motion.div
+            className="blog-manage-panel"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+          >
+            <h3>Manage post</h3>
+            <div className="blog-manage-actions">
+              <Link to={`/edit/${blog._id}`} className="manage-btn manage-edit">
+                <Edit3 size={14} />
+                Edit article
+              </Link>
+              <button onClick={handleDelete} className="manage-btn manage-delete">
+                <Trash2 size={14} />
+                Delete article
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </article>
+
+      {(author.bio || author.linkedinUrl || author.twitterUrl || author.githubUrl || author.websiteUrl) && (
+        <motion.div
+          className="author-section"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.35 }}
+        >
+          <div className="author-section-avatar">
+            {(author.username || 'G').charAt(0).toUpperCase()}
+          </div>
+          <div className="author-section-info">
+            <h4 className="author-section-name">{author.username || 'Guest Author'}</h4>
+            {author.bio && <p className="author-section-bio">{author.bio}</p>}
+            {(author.linkedinUrl || author.twitterUrl || author.githubUrl || author.websiteUrl) && (
+              <div className="author-social-links">
+                {author.linkedinUrl && (
+                  <a href={author.linkedinUrl} target="_blank" rel="noopener noreferrer" className="author-social-link linkedin" title="LinkedIn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+                  </a>
+                )}
+                {author.twitterUrl && (
+                  <a href={author.twitterUrl} target="_blank" rel="noopener noreferrer" className="author-social-link twitter" title="Twitter/X">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                  </a>
+                )}
+                {author.githubUrl && (
+                  <a href={author.githubUrl} target="_blank" rel="noopener noreferrer" className="author-social-link github" title="GitHub">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                  </a>
+                )}
+                {author.websiteUrl && (
+                  <a href={author.websiteUrl} target="_blank" rel="noopener noreferrer" className="author-social-link website" title="Website">
+                    <Globe size={16} />
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
+
+      <motion.div
+        className="blog-comments-section"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.4 }}
+      >
+        <div className="comments-header">
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <MessageCircle size={18} />
+            Discussion ({comments.length})
+          </h3>
+        </div>
+
         {comments.length > 0 ? (
-          comments.map((comment) => <CommentCard key={comment._id} comment={comment} />)
+          comments.map((comment) => (
+            <CommentCard
+              key={comment._id}
+              comment={comment}
+              canDelete={user && (comment.user?._id === userId)}
+              onDelete={handleDeleteComment}
+              onReply={handleReply}
+              postAuthorId={postAuthorId}
+              currentUserId={userId}
+            />
+          ))
         ) : (
-          <p style={{ color: '#aacbe1' }}>No comments yet.</p>
+          <div className="comments-empty">
+            <MessageCircle size={32} style={{ marginBottom: '0.5rem', opacity: 0.4 }} />
+            <p>Be the first to start the discussion.</p>
+          </div>
         )}
 
-        <div style={{ marginTop: '1.5rem' }}>
+        <div className="comment-form-section">
+          {replyTo && (
+            <div className="reply-indicator">
+              <span>Replying to <strong>@{replyTo.username}</strong></span>
+              <button onClick={cancelReply} className="cancel-reply-btn">Cancel</button>
+            </div>
+          )}
           <textarea
-            rows="3"
-            placeholder={user ? "Write a comment..." : "Log in to comment..."}
+            rows="4"
+            placeholder={user ? (replyTo ? 'Write your reply...' : 'Share your thoughts...') : 'Sign in to join the discussion...'}
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
             disabled={!user}
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              borderRadius: '12px',
-              border: 'none',
-              resize: 'none',
-              backgroundColor: '#012941',
-              color: '#f0f9ff',
-              marginBottom: '1rem',
-            }}
+            className="comment-textarea"
           />
-          <button
-            onClick={handleCommentSubmit}
-            disabled={!user}
-            style={{
-              backgroundColor: '#0FCAEB',
-              color: '#00121e',
-              border: 'none',
-              borderRadius: '20px',
-              padding: '0.5rem 1.2rem',
-              fontWeight: 'bold',
-              cursor: user ? 'pointer' : 'not-allowed',
-              boxShadow: '0 0 14px rgba(15, 202, 235, 0.5)',
-              opacity: user ? 1 : 0.6,
-            }}
-          >
-            Add Comment
-          </button>
+          <div className="comment-form-actions">
+            <motion.button
+              onClick={handleCommentSubmit}
+              disabled={!user || !newComment.trim()}
+              className="comment-submit-btn"
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <MessageCircle size={16} />
+              {replyTo ? 'Post Reply' : 'Post Comment'}
+            </motion.button>
+            {!user && (
+              <Link to="/signin" className="comment-signin-btn">
+                Sign in to comment
+              </Link>
+            )}
+          </div>
         </div>
+      </motion.div>
+
+      <div className="blog-sidebar">
+        <motion.div
+          className="sidebar-card"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.45 }}
+        >
+          <h3 className="sidebar-card-title">
+            <User size={16} style={{ verticalAlign: 'middle', marginRight: '0.4rem' }} />
+            Author
+          </h3>
+          <div className="sidebar-author">
+            <div className="sidebar-author-avatar">
+              <User size={20} />
+            </div>
+            <div>
+              <p className="sidebar-author-name">{author.username || 'Guest Author'}</p>
+              <p className="sidebar-author-bio">{author.bio || 'Creator on Blogora'}</p>
+            </div>
+          </div>
+          {(author.linkedinUrl || author.twitterUrl || author.githubUrl || author.websiteUrl) && (
+            <div className="author-social-links">
+              {author.linkedinUrl && (
+                <a href={author.linkedinUrl} target="_blank" rel="noopener noreferrer" className="author-social-link linkedin">
+                  <Linkedin size={14} />
+                </a>
+              )}
+              {author.twitterUrl && (
+                <a href={author.twitterUrl} target="_blank" rel="noopener noreferrer" className="author-social-link twitter">
+                  <Twitter size={14} />
+                </a>
+              )}
+              {author.githubUrl && (
+                <a href={author.githubUrl} target="_blank" rel="noopener noreferrer" className="author-social-link github">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                </a>
+              )}
+              {author.websiteUrl && (
+                <a href={author.websiteUrl} target="_blank" rel="noopener noreferrer" className="author-social-link website">
+                  <Globe size={14} />
+                </a>
+              )}
+            </div>
+          )}
+          <div className="sidebar-stats" style={{ marginTop: '0.75rem' }}>
+            <div className="sidebar-stat">
+              <span className="sidebar-stat-value">{relatedPosts.length + 1}</span>
+              <span className="sidebar-stat-label">Posts</span>
+            </div>
+            <div className="sidebar-stat">
+              <span className="sidebar-stat-value">
+                {author.createdAt ? new Date(author.createdAt).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) : '—'}
+              </span>
+              <span className="sidebar-stat-label">Joined</span>
+            </div>
+          </div>
+        </motion.div>
+
+        {relatedPosts.length > 0 && (
+          <motion.div
+            className="sidebar-card"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.5 }}
+          >
+            <h3 className="sidebar-card-title">Related articles</h3>
+            {relatedPosts.map((post) => (
+              <Link key={post._id} to={`/blogs/${post._id}`} className="related-post-link">
+                <div className="related-post">
+                  <h5 className="related-post-title">{post.title}</h5>
+                  <span className="related-post-author">{post.user?.username || 'Author'}</span>
+                </div>
+              </Link>
+            ))}
+          </motion.div>
+        )}
       </div>
     </motion.div>
   );
-}
-
-function buttonStyle(bg, color) {
-  return {
-    borderRadius: '30px',
-    backgroundColor: bg,
-    color: color,
-    fontWeight: 600,
-    padding: '0.6rem 1.5rem',
-    border: 'none',
-    boxShadow: `0 0 14px ${bg === '#dc3545' ? 'rgba(220, 53, 69, 0.5)' : 'rgba(15, 202, 235, 0.5)'}`,
-    textDecoration: 'none',
-    transition: 'all 0.3s ease',
-  };
-}
-
-function hoverEffect(e, bg, color = null) {
-  e.currentTarget.style.backgroundColor = bg;
-  if (color) e.currentTarget.style.color = color;
-  e.currentTarget.style.boxShadow = `0 0 20px ${bg === '#b02a37' ? 'rgba(220, 53, 69, 0.7)' : 'rgba(15, 202, 235, 0.7)'}`;
 }
 
 export default BlogPage;
