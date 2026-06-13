@@ -1,26 +1,26 @@
 import api from './api';
 
-/**
- * Register new user
- * @param {object} param0
- * @param {string} param0.email
- * @param {string} param0.username
- * @param {string} param0.password
- * @returns {Promise<object>} User data or throws error
- */
 export async function register({ email, username, password }) {
   const response = await api.post('/auth/register', { email, username, password });
   return response.data;
 }
 
-/**
- * Sign in existing user
- * @param {object} param0
- * @param {string} param0.email
- * @param {string} param0.password
- * @returns {Promise<object>} User data (including token) or throws error
- */
 export async function signIn({ email, password }) {
   const response = await api.post('/auth/signin', { email, password });
+  return response.data;
+}
+
+export async function forgotPassword(email) {
+  const response = await api.post('/auth/forgot-password', { email });
+  return response.data;
+}
+
+export async function resetPassword({ token, password }) {
+  const response = await api.post(`/auth/reset-password/${token}`, { password });
+  return response.data;
+}
+
+export async function updateProfile(profileData) {
+  const response = await api.put('/auth/profile', profileData);
   return response.data;
 }
