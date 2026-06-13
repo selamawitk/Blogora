@@ -1,6 +1,6 @@
-// models/User.js
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 const userSchema = new mongoose.Schema(
   {
@@ -23,16 +23,25 @@ const userSchema = new mongoose.Schema(
       required: true,
       minlength: 6,
     },
+    bio: {
+      type: String,
+      default: '',
+      maxlength: 300,
+    },
+    linkedinUrl: { type: String, default: '' },
+    twitterUrl: { type: String, default: '' },
+    githubUrl: { type: String, default: '' },
+    websiteUrl: { type: String, default: '' },
+    resetPasswordToken: String,
+    resetPasswordExpire: Date,
   },
   {
     timestamps: true,
   }
 );
 
-// Hash password before saving
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
-
   try {
     const salt = await bcrypt.genSalt(12);
     this.password = await bcrypt.hash(this.password, salt);
@@ -42,11 +51,16 @@ userSchema.pre('save', async function (next) {
   }
 });
 
-// Compare candidate password with hashed password
 userSchema.methods.matchPassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-const User = mongoose.model('User', userSchema);
+userSchema.methods.getResetPasswordToken = function () {
+  const resetToken = crypto.randomBytes(20).toString('hex');
+  this.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+  this.resetPasswordExpire = Date.now() + 30 * 60 * 1000;
+  return resetToken;
+};
 
-export default User; // ✅ ES Module export
+const User = mongoose.model('User', userSchema);
+export default User;
