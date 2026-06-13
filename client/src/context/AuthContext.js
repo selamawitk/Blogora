@@ -11,18 +11,32 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     try {
       const savedUser = localStorage.getItem('user');
+      const savedToken = localStorage.getItem('token');
+
       if (savedUser) {
         const parsedUser = JSON.parse(savedUser);
         setUser(parsedUser);
-        // Set the token on initial load if user data is found
-        setAuthToken(parsedUser.token);
+        setAuthToken(parsedUser.token || savedToken);
+      } else if (savedToken) {
+        setAuthToken(savedToken);
       }
     } catch (error) {
       console.error('Failed to parse user from localStorage:', error);
-      localStorage.removeItem('user'); // Clear corrupt data
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
     } finally {
       setLoading(false);
     }
+
+    const handleUnauthorized = () => {
+      setUser(null);
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      setAuthToken(null);
+    };
+
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
   }, []);
 
   const login = (userData) => {
