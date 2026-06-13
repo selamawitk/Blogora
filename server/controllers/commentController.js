@@ -4,10 +4,20 @@ import Post from '../models/Post.js';
 
 export const getComments = async (req, res) => {
   try {
-    const comments = await Comment.find({ post: req.params.postId })
-      .populate('user', 'username')
+    const comments = await Comment.find({ post: req.params.postId, parentComment: null })
+      .populate('user', '_id username')
       .sort({ createdAt: 1 });
-    res.json(comments);
+
+    const commentsWithReplies = await Promise.all(
+      comments.map(async (comment) => {
+        const replies = await Comment.find({ parentComment: comment._id })
+          .populate('user', '_id username')
+          .sort({ createdAt: 1 });
+        return { ...comment.toObject(), replies };
+      })
+    );
+
+    res.json(commentsWithReplies);
   } catch (error) {
     console.error(`Error in getComments controller: ${error.message}`);
     res.status(500).json({ message: 'Internal Server Error: Could not retrieve comments.' });
@@ -16,11 +26,9 @@ export const getComments = async (req, res) => {
 
 export const createComment = async (req, res) => {
   const { postId } = req.params;
-  const { content } = req.body;
+  const { content, parentComment } = req.body;
 
-  // The 'protect' middleware ensures req.user is set
   if (!req.user || !req.user._id) {
-    // This should ideally be caught by 'protect' middleware before this point
     return res.status(401).json({ message: 'Not authorized, user not found.' });
   }
 
@@ -34,15 +42,22 @@ export const createComment = async (req, res) => {
       return res.status(404).json({ message: 'Post not found.' });
     }
 
+    if (parentComment) {
+      const parentExists = await Comment.findById(parentComment);
+      if (!parentExists) {
+        return res.status(404).json({ message: 'Parent comment not found.' });
+      }
+    }
+
     const comment = new Comment({
       content,
-      user: req.user._id, // Assign the authenticated user's ID
+      user: req.user._id,
       post: postId,
+      parentComment: parentComment || null,
     });
 
     const createdComment = await comment.save();
-    // Populate the user on the created comment before sending it back
-    const populatedComment = await Comment.findById(createdComment._id).populate('user', 'username');
+    const populatedComment = await Comment.findById(createdComment._id).populate('user', '_id username');
     res.status(201).json(populatedComment);
   } catch (error) {
     console.error(`Error in createComment controller: ${error.message}`);
