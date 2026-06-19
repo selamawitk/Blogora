@@ -1,15 +1,12 @@
 const sendEmail = async ({ to, subject, text, html }) => {
-  if (process.env.NODE_ENV === 'production') {
-    // Log email for now — swap this block with a real email provider
-    console.log(`[EMAIL] To: ${to}, Subject: ${subject}`);
-    return;
+  if (process.env.EMAIL_HOST) {
+    console.warn('[EMAIL] SMTP not configured — install nodemailer and set EMAIL_HOST/EMAIL_USER/EMAIL_PASS.');
   }
 
-  // Development: log to console
   console.log('═══════════════════════════════════════');
   console.log(`  To: ${to}`);
   console.log(`  Subject: ${subject}`);
-  console.log(`  ${text}`);
+  console.log(`  Text: ${text}`);
   console.log('═══════════════════════════════════════');
 };
 
