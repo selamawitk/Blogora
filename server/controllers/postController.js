@@ -1,51 +1,95 @@
+import mongoose from 'mongoose';
 import Post from '../models/Post.js';
 import Comment from '../models/Comment.js';
 import Like from '../models/Like.js';
 
-// @desc    Get all posts with like and comment counts
-// @route   GET /api/posts
-// @access  Public
 export const getPosts = async (req, res) => {
   try {
-    const posts = await Post.find({})
-      .populate('user', 'username createdAt bio linkedinUrl twitterUrl githubUrl websiteUrl')
-      .sort({ createdAt: -1 })
-      .lean();
+    const posts = await Post.aggregate([
+      { $sort: { createdAt: -1 } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'user',
+          foreignField: '_id',
+          as: 'user',
+        },
+      },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'likes',
+          localField: '_id',
+          foreignField: 'post',
+          as: 'likes',
+        },
+      },
+      {
+        $lookup: {
+          from: 'comments',
+          localField: '_id',
+          foreignField: 'post',
+          as: 'comments',
+        },
+      },
+      {
+        $addFields: {
+          likesCount: { $size: '$likes' },
+          commentsCount: { $size: '$comments' },
+        },
+      },
+      { $project: { likes: 0, comments: 0, 'user.password': 0 } },
+    ]);
 
-    const postsWithCounts = await Promise.all(
-      posts.map(async (post) => {
-        const [likesCount, commentsCount] = await Promise.all([
-          Like.countDocuments({ post: post._id }),
-          Comment.countDocuments({ post: post._id }),
-        ]);
-        return { ...post, likesCount, commentsCount };
-      })
-    );
-
-    return res.json({ success: true, data: postsWithCounts });
+    return res.json({ success: true, data: posts });
   } catch (error) {
     console.error('getPosts error:', error);
     return res.status(500).json({ success: false, message: 'Failed to retrieve posts.' });
   }
 };
 
-// @desc    Get single post by ID with like and comment counts
-// @route   GET /api/posts/:id
-// @access  Public
 export const getPostById = async (req, res) => {
   try {
-    const post = await Post.findById(req.params.id)
-      .populate('user', 'username createdAt bio linkedinUrl twitterUrl githubUrl websiteUrl')
-      .lean();
+    const posts = await Post.aggregate([
+      { $match: { _id: new mongoose.Types.ObjectId(req.params.id) } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'user',
+          foreignField: '_id',
+          as: 'user',
+        },
+      },
+      { $unwind: { path: '$user', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'likes',
+          localField: '_id',
+          foreignField: 'post',
+          as: 'likes',
+        },
+      },
+      {
+        $lookup: {
+          from: 'comments',
+          localField: '_id',
+          foreignField: 'post',
+          as: 'comments',
+        },
+      },
+      {
+        $addFields: {
+          likesCount: { $size: '$likes' },
+          commentsCount: { $size: '$comments' },
+        },
+      },
+      { $project: { likes: 0, comments: 0, 'user.password': 0 } },
+    ]);
 
-    if (post) {
-      const [likesCount, commentsCount] = await Promise.all([
-        Like.countDocuments({ post: post._id }),
-        Comment.countDocuments({ post: post._id }),
-      ]);
-      return res.json({ success: true, data: { ...post, likesCount, commentsCount } });
+    if (!posts.length) {
+      return res.status(404).json({ success: false, message: 'Post not found' });
     }
-    return res.status(404).json({ success: false, message: 'Post not found' });
+    return res.json({ success: true, data: posts[0] });
   } catch (error) {
     console.error('getPostById error:', error);
     return res.status(500).json({ success: false, message: 'Failed to retrieve post.' });
