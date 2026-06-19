@@ -214,11 +214,11 @@ function BlogPage() {
         <meta property="og:description" content={ogDescription} />
         <meta property="og:type" content="article" />
         <meta property="og:url" content={pageUrl} />
-        <meta property="og:image" content="https://blogora.app/og-image.png" />
+        <meta property="og:image" content="/favicon.svg" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={`${blog.title} — Blogora`} />
         <meta name="twitter:description" content={ogDescription} />
-        <meta name="twitter:image" content="https://blogora.app/og-image.png" />
+        <meta name="twitter:image" content="/favicon.svg" />
       </Helmet>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
