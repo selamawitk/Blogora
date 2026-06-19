@@ -1,30 +1,49 @@
 import Post from '../models/Post.js';
+import Comment from '../models/Comment.js';
+import Like from '../models/Like.js';
 
-// @desc    Get all posts
+// @desc    Get all posts with like and comment counts
 // @route   GET /api/posts
 // @access  Public
 export const getPosts = async (req, res) => {
   try {
-    // Populate the 'user' field to get basic author metadata
     const posts = await Post.find({})
       .populate('user', 'username createdAt bio linkedinUrl twitterUrl githubUrl websiteUrl')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
-    return res.json({ success: true, data: posts });
+    const postsWithCounts = await Promise.all(
+      posts.map(async (post) => {
+        const [likesCount, commentsCount] = await Promise.all([
+          Like.countDocuments({ post: post._id }),
+          Comment.countDocuments({ post: post._id }),
+        ]);
+        return { ...post, likesCount, commentsCount };
+      })
+    );
+
+    return res.json({ success: true, data: postsWithCounts });
   } catch (error) {
     console.error('getPosts error:', error);
     return res.status(500).json({ success: false, message: 'Failed to retrieve posts.' });
   }
 };
 
-// @desc    Get single post by ID
+// @desc    Get single post by ID with like and comment counts
 // @route   GET /api/posts/:id
 // @access  Public
 export const getPostById = async (req, res) => {
   try {
-    const post = await Post.findById(req.params.id).populate('user', 'username createdAt bio linkedinUrl twitterUrl githubUrl websiteUrl');
+    const post = await Post.findById(req.params.id)
+      .populate('user', 'username createdAt bio linkedinUrl twitterUrl githubUrl websiteUrl')
+      .lean();
+
     if (post) {
-      return res.json({ success: true, data: post });
+      const [likesCount, commentsCount] = await Promise.all([
+        Like.countDocuments({ post: post._id }),
+        Comment.countDocuments({ post: post._id }),
+      ]);
+      return res.json({ success: true, data: { ...post, likesCount, commentsCount } });
     }
     return res.status(404).json({ success: false, message: 'Post not found' });
   } catch (error) {
@@ -56,7 +75,8 @@ export const createPost = async (req, res) => {
     });
 
     const createdPost = await post.save();
-    return res.status(201).json({ success: true, data: createdPost });
+    const postObj = createdPost.toObject();
+    return res.status(201).json({ success: true, data: { ...postObj, likesCount: 0, commentsCount: 0 } });
   } catch (error) {
     console.error('createPost error:', error);
     return res.status(500).json({ success: false, message: 'Failed to create post.' });
@@ -95,8 +115,12 @@ export const deletePost = async (req, res) => {
 
     if (!post) return res.status(404).json({ success: false, message: 'Post not found' });
 
-    // Ownership check is handled by `authorizePostOwnership` middleware before this controller
-    await Post.deleteOne({ _id: post._id }); // Use deleteOne with query
+    // Cascade delete: remove associated comments and likes
+    await Promise.all([
+      Comment.deleteMany({ post: post._id }),
+      Like.deleteMany({ post: post._id }),
+      Post.deleteOne({ _id: post._id }),
+    ]);
     return res.json({ success: true, message: 'Post removed' });
   } catch (error) {
     console.error('deletePost error:', error);
