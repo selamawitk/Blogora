@@ -1,12 +1,14 @@
 import path from 'path';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import postRoutes from './routes/postRoutes.js';
 import commentRoutes from './routes/commentRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import likeRoutes from './routes/likeRoutes.js';
+import newsletterRoutes from './routes/newsletterRoutes.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 import connectDB from './config/db.js';
 
@@ -16,11 +18,21 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 // Validate required environment variables
-const requiredEnvs = ['JWT_SECRET'];
+const requiredEnvs = ['MONGO_URI', 'JWT_SECRET'];
 const missing = requiredEnvs.filter((k) => !process.env[k]);
 if (missing.length > 0) {
   console.error('\n❌ Missing required environment variables: ' + missing.join(', '));
-  console.error('Please create a .env file with the following keys: MONGO_URI, JWT_SECRET, PORT (optional)');
+  console.error('Please create a .env file with: MONGO_URI, JWT_SECRET, PORT (optional)');
+  process.exit(1);
+}
+
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  console.error('\n❌ JWT_SECRET must be at least 32 characters long for production safety.');
+  process.exit(1);
+}
+
+if (!process.env.MONGO_URI.startsWith('mongodb')) {
+  console.error('\n❌ MONGO_URI must be a valid MongoDB connection string starting with mongodb:// or mongodb+srv://');
   process.exit(1);
 }
 
@@ -36,8 +48,13 @@ async function startServer() {
   }
 
   app.disable('x-powered-by');
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+
+  // Security headers
+  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+
+  // Body parsing with size limits
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   const allowedOrigins = process.env.CLIENT_URL
     ? process.env.CLIENT_URL.split(',').map((url) => url.trim()).filter(Boolean)
@@ -45,11 +62,18 @@ async function startServer() {
 
   const corsOptions = {
     origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error(`CORS blocked for origin: ${origin}`));
+      // Allow requests with no origin (server-to-server, curl, etc.)
+      if (!origin) return callback(null, true);
+      // Allow same-origin requests
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      // In production with single-service deployment, the frontend is same-origin
+      // so this only matters for external API consumers
+      const errorMsg = `CORS blocked for origin: ${origin}`;
+      if (process.env.NODE_ENV === 'production') {
+        console.warn(errorMsg);
+        return callback(null, false);
       }
+      callback(new Error(errorMsg));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -81,6 +105,7 @@ async function startServer() {
   app.use('/api', commentRoutes);
   app.use('/api', likeRoutes);
   app.use('/api/auth', authRoutes);
+  app.use('/api', newsletterRoutes);
 
   if (process.env.NODE_ENV === 'production') {
     app.use(express.static(path.join(__dirname, '../client/build')));
