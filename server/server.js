@@ -107,13 +107,6 @@ async function startServer() {
   app.use('/api/auth', authRoutes);
   app.use('/api', newsletterRoutes);
 
-  if (process.env.NODE_ENV === 'production') {
-    app.use(express.static(path.join(__dirname, '../client/build')));
-    app.get('*', (req, res) => {
-      res.sendFile(path.resolve(__dirname, '../client/build', 'index.html'));
-    });
-  }
-
   app.use(notFound);
   app.use(errorHandler);
 
