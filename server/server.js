@@ -58,7 +58,7 @@ async function startServer() {
 
   const allowedOrigins = process.env.CLIENT_URL
     ? process.env.CLIENT_URL.split(',').map((url) => url.trim()).filter(Boolean)
-    : ['http://localhost:3000'];
+    : ['http://localhost:3000', 'http://localhost:5173', 'https://blogora-amber.vercel.app'];
 
   const corsOptions = {
     origin(origin, callback) {
