@@ -1,11 +1,11 @@
 services:
-  # Backend API + Static Frontend (single service)
+  # Backend API (frontend deployed separately on Vercel)
   - type: web
     name: blogora-api
     env: node
     region: oregon
     plan: free
-    buildCommand: npm install && npm run build
+    buildCommand: npm --prefix server install
     startCommand: npm start
     healthCheckPath: /api/stats
     envVars:
