@@ -11,12 +11,10 @@ function ForgotPasswordPage() {
   const [showModal, setShowModal] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
   const [modalTitle, setModalTitle] = useState('');
-  const [resetToken, setResetToken] = useState('');
 
-  const showCustomModal = (title, message, token) => {
+  const showCustomModal = (title, message) => {
     setModalTitle(title);
     setModalMessage(message);
-    setResetToken(token || '');
     setShowModal(true);
   };
 
@@ -31,11 +29,8 @@ function ForgotPasswordPage() {
 
     setSubmitting(true);
     try {
-      const data = await forgotPassword(email);
-      const msg = data.resetToken
-        ? `A reset token has been generated. Copy it below and go to the Reset Password page.`
-        : data.message;
-      showCustomModal('Success', msg, data.resetToken);
+      await forgotPassword(email);
+      showCustomModal('Check Your Email', 'If an account with that email exists, a password reset link has been sent. Please check your inbox (and spam folder).');
     } catch (err) {
       const message = err?.response?.data?.message || 'Failed to process request. Please try again.';
       showCustomModal('Error', message);
@@ -102,29 +97,15 @@ function ForgotPasswordPage() {
       <Modal show={showModal} onHide={handleCloseModal} centered>
         <Modal.Header closeButton>
           <Modal.Title className={modalTitle === 'Error' ? 'text-danger' : 'text-success'}>
-            {modalTitle}
+            {modalTitle === 'Error' ? 'Error' : 'Success'}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <p>{modalMessage}</p>
-          {resetToken && (
-            <div
-              className="p-3 rounded"
-              style={{ background: 'rgba(11, 31, 58, 0.9)', color: '#0FCAEB', wordBreak: 'break-all' }}
-            >
-              <strong>Reset Token:</strong>
-              <br />
-              <code style={{ color: '#e2f1f5' }}>{resetToken}</code>
-              <br />
-              <small style={{ color: '#b2dfdb' }}>
-                Copy this token and go to the Reset Password page.
-              </small>
-            </div>
-          )}
-          {resetToken && (
-            <div className="mt-3 text-center">
+          {modalTitle !== 'Error' && (
+            <div className="mt-3" style={{ textAlign: 'center' }}>
               <Link
-                to={`/reset-password/${resetToken}`}
+                to="/signin"
                 className="btn rounded-pill px-4 py-2"
                 style={{
                   backgroundColor: '#0FCAEB',
@@ -134,7 +115,7 @@ function ForgotPasswordPage() {
                 }}
                 onClick={handleCloseModal}
               >
-                Go to Reset Password
+                Back to Sign In
               </Link>
             </div>
           )}
