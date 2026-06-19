@@ -2,9 +2,10 @@ import mongoose from 'mongoose';
 
 const commentSchema = new mongoose.Schema(
   {
-    content: { // Changed from 'text' for consistency and clarity
+    content: {
       type: String,
       required: true,
+      maxlength: 5000,
     },
     user: { // Changed from 'author' to link to User model
       type: mongoose.Schema.Types.ObjectId,
