@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { BookOpen, TrendingUp, ArrowRight, PenSquare, Globe, Mail } from 'lucide-react';
@@ -22,6 +23,9 @@ function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState({ totalPosts: 0, totalAuthors: 0 });
+  const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [newsletterMsg, setNewsletterMsg] = useState('');
+  const [newsletterSubmitting, setNewsletterSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchBlogs = async () => {
@@ -68,7 +72,6 @@ function HomePage() {
     return Array.from(map.values()).sort((a, b) => b.count - a.count).slice(0, 6);
   }, [blogs]);
 
-  const featuredPosts = blogs.slice(0, 3);
   const trendingPosts = blogs.slice(0, 9);
 
   const containerVariants = {
@@ -90,6 +93,14 @@ function HomePage() {
 
   return (
     <div className="home-page">
+      <Helmet>
+        <title>Blogora — Modern Storytelling Platform</title>
+        <meta name="description" content="Discover compelling posts, publish with confidence, and present your work with a premium editorial experience." />
+        <meta property="og:title" content="Blogora — Modern Storytelling Platform" />
+        <meta property="og:description" content="Discover compelling posts, publish with confidence on Blogora." />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+      </Helmet>
       <section className="hero-section" style={{ position: 'relative', overflow: 'hidden' }}>
         <div className="hero-floating-shape hero-floating-shape-1" />
         <div className="hero-floating-shape hero-floating-shape-2" />
@@ -112,7 +123,7 @@ function HomePage() {
                 Premium Blogging Platform
               </motion.span>
               <motion.h1
-                className="hero-title mb-4"
+                className="hero-title mb-3"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.25 }}
@@ -325,21 +336,44 @@ function HomePage() {
                 <p className="newsletter-text">
                   Get the latest stories and updates delivered to your inbox.
                 </p>
-                <form className="newsletter-form" onSubmit={(e) => e.preventDefault()}>
+                <form className="newsletter-form" onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!newsletterEmail.trim()) return;
+                  setNewsletterSubmitting(true);
+                  setNewsletterMsg('');
+                  try {
+                    const res = await api.post('/newsletter', { email: newsletterEmail });
+                    setNewsletterMsg(res.data.message || 'Subscribed!');
+                    setNewsletterEmail('');
+                  } catch (err) {
+                    setNewsletterMsg(err.response?.data?.message || 'Something went wrong.');
+                  } finally {
+                    setNewsletterSubmitting(false);
+                  }
+                }}>
                   <input
                     type="email"
                     placeholder="Enter your email"
                     className="newsletter-input"
+                    value={newsletterEmail}
+                    onChange={(e) => setNewsletterEmail(e.target.value)}
+                    disabled={newsletterSubmitting}
                   />
                   <motion.button
                     type="submit"
                     className="newsletter-btn"
                     whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.97 }}
+                    disabled={newsletterSubmitting}
                   >
-                    Subscribe
+                    {newsletterSubmitting ? 'Subscribing...' : 'Subscribe'}
                   </motion.button>
                 </form>
+                {newsletterMsg && (
+                  <p style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--primary)' }}>
+                    {newsletterMsg}
+                  </p>
+                )}
               </motion.div>
             </motion.div>
           </motion.section>
