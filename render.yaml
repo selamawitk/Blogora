@@ -5,7 +5,8 @@ services:
     env: node
     region: oregon
     plan: free
-    buildCommand: npm --prefix server install
+    rootDir: server
+    buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /api/stats
     envVars:
