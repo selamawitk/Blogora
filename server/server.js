@@ -83,6 +83,15 @@ async function startServer() {
   app.use(cors(corsOptions));
   app.options(/.*/, cors(corsOptions));
 
+  // Root health check
+  app.get('/api', (req, res) => {
+    res.json({ status: 'ok', message: 'Blogora API is running', version: '1.0.0', dbConnected });
+  });
+
+  app.get('/', (req, res) => {
+    res.json({ status: 'ok', message: 'Blogora API is running', version: '1.0.0', dbConnected });
+  });
+
   // Stats endpoint for homepage
   app.get('/api/stats', async (req, res) => {
     try {
