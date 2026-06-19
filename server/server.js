@@ -9,6 +9,7 @@ import commentRoutes from './routes/commentRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import likeRoutes from './routes/likeRoutes.js';
 import newsletterRoutes from './routes/newsletterRoutes.js';
+import mongoose from 'mongoose';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 import connectDB from './config/db.js';
 
@@ -39,12 +40,28 @@ if (!process.env.MONGO_URI.startsWith('mongodb')) {
 const app = express();
 let dbConnected = false;
 
+mongoose.connection.on('connected', () => {
+  dbConnected = true;
+  console.log('MongoDB connection established');
+});
+
+mongoose.connection.on('disconnected', () => {
+  dbConnected = false;
+  console.warn('⚠️ MongoDB disconnected. Will auto-reconnect.');
+});
+
+mongoose.connection.on('error', (err) => {
+  dbConnected = false;
+  console.error('❌ MongoDB connection error:', err.message);
+});
+
 async function startServer() {
   try {
     await connectDB();
     dbConnected = true;
   } catch (err) {
     console.warn('⚠️ MongoDB not available — running without database. Some features will be limited.');
+    console.warn('   Make sure MONGO_URI is correct and MongoDB Atlas IP whitelist includes Render.');
   }
 
   app.disable('x-powered-by');

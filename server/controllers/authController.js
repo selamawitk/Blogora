@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import mongoose from 'mongoose';
 import User from '../models/User.js';
 import { sendEmail } from '../services/emailService.js';
 
@@ -63,7 +64,10 @@ const register = async (req, res) => {
     const token = generateToken(user);
     res.status(201).json(userResponse(user, token));
   } catch (err) {
-    console.error('Register error:', err);
+    console.error('Register error:', err.message);
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ message: 'Database not connected. Please check MongoDB Atlas IP whitelist and credentials in Render Dashboard.' });
+    }
     res.status(500).json({ message: 'Server error during registration.' });
   }
 };
@@ -85,7 +89,10 @@ const signIn = async (req, res) => {
     const token = generateToken(user);
     res.json(userResponse(user, token));
   } catch (err) {
-    console.error('Sign-in error:', err);
+    console.error('Sign-in error:', err.message);
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ message: 'Database not connected. Please check MongoDB Atlas IP whitelist and credentials in Render Dashboard.' });
+    }
     res.status(500).json({ message: 'Server error during sign-in.' });
   }
 };
