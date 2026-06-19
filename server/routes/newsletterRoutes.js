@@ -1,13 +1,24 @@
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import Newsletter from '../models/Newsletter.js';
 
 const router = express.Router();
 
-router.post('/newsletter', async (req, res) => {
+const newsletterLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { message: 'Too many subscription attempts. Try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+router.post('/newsletter', newsletterLimiter, async (req, res) => {
   try {
     const email = String(req.body.email || '').toLowerCase().trim();
-    if (!email) {
-      return res.status(400).json({ message: 'Email is required.' });
+    if (!email || !emailRegex.test(email)) {
+      return res.status(400).json({ message: 'A valid email address is required.' });
     }
 
     const exists = await Newsletter.findOne({ email });
