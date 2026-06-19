@@ -2,8 +2,8 @@ import mongoose from 'mongoose';
 
 const postSchema = new mongoose.Schema(
   {
-    title: { type: String, required: true },
-    content: { type: String, required: true },
+    title: { type: String, required: true, maxlength: 200 },
+    content: { type: String, required: true, maxlength: 50000 },
     user: { // to link the post to its creator
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User', //  references User model
