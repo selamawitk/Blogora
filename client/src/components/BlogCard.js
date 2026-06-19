@@ -46,11 +46,11 @@ function BlogCard({ blog, featured, index = 0 }) {
       whileHover={{ y: -8, transition: { duration: 0.25, ease: 'easeOut' } }}
       className="blog-card"
       style={{
-        boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
         transition: 'box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
       }}
-      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 16px 48px rgba(0,0,0,0.5)'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)'; }}
+      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 12px 36px rgba(0,0,0,0.35)'; }}
+      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.15)'; }}
     >
       <Link to={`/blogs/${blog._id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
         <div className="blog-card-image" style={{ background: getGradient(blog.title) }}>
