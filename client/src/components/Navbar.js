@@ -9,6 +9,16 @@ function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
 
+  // Use AuthContext as single source of truth; also verify token exists
+  const hasValidToken = (() => {
+    if (!user) return false;
+    try {
+      return Boolean(localStorage.getItem('token'));
+    } catch {
+      return false;
+    }
+  })();
+
   useEffect(() => {
     setMenuOpen(false);
   }, [location.pathname]);
@@ -21,6 +31,7 @@ function Navbar() {
 
   if (loading) return null;
 
+  const isAuthenticated = Boolean(user) && hasValidToken;
   const closeMenu = () => setMenuOpen(false);
 
   return (
@@ -37,7 +48,7 @@ function Navbar() {
                 Home
               </NavLink>
             </li>
-            {user ? (
+            {isAuthenticated ? (
               <>
                 <li>
                   <NavLink to="/create" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
@@ -90,7 +101,7 @@ function Navbar() {
               Home
             </NavLink>
           </li>
-          {user ? (
+          {isAuthenticated ? (
             <>
               <li className="mobile-menu-item">
                 <NavLink to="/create" className={({ isActive }) => isActive ? 'mobile-menu-link active' : 'mobile-menu-link'} onClick={closeMenu}>
