@@ -79,7 +79,11 @@ export const deleteComment = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to delete this comment.' });
     }
 
-    await Comment.deleteOne({ _id: req.params.id });
+    // Cascade delete: if this is a parent comment, delete replies too
+    await Promise.all([
+      Comment.deleteMany({ parentComment: comment._id }),
+      Comment.deleteOne({ _id: comment._id }),
+    ]);
     res.json({ message: 'Comment removed.' });
   } catch (error) {
     console.error(`Error in deleteComment controller: ${error.message}`);
