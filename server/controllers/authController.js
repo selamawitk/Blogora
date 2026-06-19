@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import User from '../models/User.js';
+import { sendEmail } from '../services/emailService.js';
 
 const JWT_EXPIRES_IN = '7d';
 
@@ -98,15 +99,24 @@ const forgotPassword = async (req, res) => {
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({ message: 'No account with that email exists.' });
+      // Don't reveal whether email exists
+      return res.json({ message: 'If an account with that email exists, a reset link has been sent.' });
     }
 
     const resetToken = user.getResetPasswordToken();
     await user.save({ validateBeforeSave: false });
 
+    const resetUrl = `${process.env.CLIENT_URL ? process.env.CLIENT_URL.split(',')[0].trim() : 'http://localhost:3000'}/reset-password/${resetToken}`;
+
+    await sendEmail({
+      to: user.email,
+      subject: 'Password Reset Request - Blogora',
+      text: `You requested a password reset. Use this link to reset your password: ${resetUrl}\n\nThis link expires in 30 minutes.\n\nIf you didn't request this, please ignore this email.`,
+      html: `<p>You requested a password reset.</p><p>Click the link below to reset your password:</p><p><a href="${resetUrl}">${resetUrl}</a></p><p>This link expires in 30 minutes.</p><p>If you didn't request this, please ignore this email.</p>`,
+    });
+
     res.json({
-      message: 'Password reset link sent to your email.',
-      resetToken,
+      message: 'If an account with that email exists, a reset link has been sent.',
     });
   } catch (err) {
     console.error('Forgot password error:', err);
